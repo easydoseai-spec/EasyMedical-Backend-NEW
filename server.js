@@ -96,9 +96,158 @@ app.get('/api/auth/epic/callback', async (req, res) => {
   }
 });
 
+// Vision analysis endpoints
+app.post('/api/vision/analyze-medication', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image is required' });
+    }
+
+    const response = await client.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: image,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Please analyze this medication bottle and extract the following information in JSON format: { "name": "medication name", "dosage": "dosage amount", "frequency": "how often to take", "directions": "directions for use", "warnings": "any warnings or side effects noted" }. Be precise and only include information visible on the label.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const textContent = response.content.find(c => c.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return res.status(500).json({ error: 'Unexpected response type' });
+    }
+
+    // Try to parse JSON from response
+    let analysisData;
+    try {
+      const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
+      analysisData = jsonMatch ? JSON.parse(jsonMatch[0]) : { raw: textContent.text };
+    } catch {
+      analysisData = { raw: textContent.text };
+    }
+
+    res.json({
+      success: true,
+      analysis: analysisData,
+      rawResponse: textContent.text,
+    });
+  } catch (error) {
+    console.error('Medication analysis error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+app.post('/api/vision/analyze-document', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image is required' });
+    }
+
+    const response = await client.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 800,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: image,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Please analyze this medical document and extract key information. Provide a structured summary including: type of document (prescription, test result, lab report, etc.), date, key findings/medications, and any important notes or results.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const textContent = response.content.find(c => c.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return res.status(500).json({ error: 'Unexpected response type' });
+    }
+
+    res.json({
+      success: true,
+      analysis: textContent.text,
+    });
+  } catch (error) {
+    console.error('Document analysis error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+app.post('/api/vision/analyze-record', async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image is required' });
+    }
+
+    const response = await client.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 800,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: image,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Please analyze this health record/result and extract key information. Provide a clear summary including: what type of record this is, important values or measurements, reference ranges if shown, and any abnormal findings or concerns.',
+            },
+          ],
+        },
+      ],
+    });
+
+    const textContent = response.content.find(c => c.type === 'text');
+    if (!textContent || textContent.type !== 'text') {
+      return res.status(500).json({ error: 'Unexpected response type' });
+    }
+
+    res.json({
+      success: true,
+      analysis: textContent.text,
+    });
+  } catch (error) {
+    console.error('Record analysis error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'EasyMedical Backend API', routes: ['/api/chat', '/api/auth/epic/authorize', '/api/auth/epic/callback'] });
+  res.json({ message: 'EasyMedical Backend API', routes: ['/api/chat', '/api/auth/epic/authorize', '/api/auth/epic/callback', '/api/vision/analyze-medication', '/api/vision/analyze-document', '/api/vision/analyze-record'] });
 });
 
 app.listen(PORT, () => {
