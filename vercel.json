@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "env": [
+    "ANTHROPIC_API_KEY",
+    "EPIC_CLIENT_ID",
+    "EPIC_CLIENT_SECRET",
+    "BACKEND_URL"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "easymedical-backend",
+  "version": "1.0.0",
+  "description": "Backend API for EasyMedical chatbot",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
