@@ -65,15 +65,25 @@ app.get('/api/auth/epic/authorize', (req, res) => {
 app.get('/api/auth/epic/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
+    console.log('Callback received with code:', code ? 'yes' : 'no', 'state:', state ? 'yes' : 'no');
+
     if (!code || !state) {
+      console.error('Missing code or state');
       return res.status(400).json({ error: 'Missing code or state' });
     }
 
     const EPIC_TOKEN_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token';
+    const redirectUri = `${process.env.BACKEND_URL || 'https://easymedical-backend.vercel.app'}/api/auth/epic/callback`;
+
+    console.log('Exchanging code for token...');
+    console.log('Redirect URI:', redirectUri);
+    console.log('Client ID:', process.env.EPIC_CLIENT_ID ? 'set' : 'NOT SET');
+    console.log('Client Secret:', process.env.EPIC_CLIENT_SECRET ? 'set' : 'NOT SET');
+
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
-    params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend.vercel.app'}/api/auth/epic/callback`);
+    params.append('redirect_uri', redirectUri);
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('client_secret', process.env.EPIC_CLIENT_SECRET || '');
 
@@ -83,16 +93,22 @@ app.get('/api/auth/epic/callback', async (req, res) => {
       body: params.toString(),
     });
 
+    console.log('Epic response status:', tokenResponse.status);
+    const responseText = await tokenResponse.text();
+    console.log('Epic response:', responseText);
+
     if (!tokenResponse.ok) {
-      return res.status(400).json({ error: 'Failed to exchange code' });
+      console.error('Token exchange failed:', responseText);
+      return res.status(400).json({ error: 'Failed to exchange code', details: responseText });
     }
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = JSON.parse(responseText);
     const redirectUrl = `easymedical://auth?token=${encodeURIComponent(tokenData.access_token)}`;
+    console.log('Token exchange successful, redirecting to app');
     res.redirect(302, redirectUrl);
   } catch (error) {
     console.error('Callback error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 });
 
