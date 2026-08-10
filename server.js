@@ -78,8 +78,12 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('scope', 'launch/patient openid fhirUser patient/Patient.read patient/Appointment.read patient/Medication.read patient/Condition.read patient/Observation.read');
     params.append('state', state);
 
+    const fullUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
-    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
+    console.log('🔗 Full URL:', fullUrl);
+    console.log('📋 Client ID:', process.env.EPIC_CLIENT_ID);
+    console.log('📋 Redirect URI:', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
+    res.redirect(302, fullUrl);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
