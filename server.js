@@ -65,7 +65,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Epic OAuth authorize - redirects to Epic's OAuth endpoint
+// Epic OAuth authorize - returns HTML that redirects to Epic's OAuth endpoint
 app.get('/api/auth/epic/authorize', (req, res) => {
   try {
     const EPIC_OAUTH_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize';
@@ -78,10 +78,29 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('scope', 'launch/patient openid fhirUser patient/Patient.read patient/Appointment.read patient/Medication.read patient/Condition.read patient/Observation.read');
     params.append('state', state);
 
+    const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
 
-    // Redirect to Epic's OAuth endpoint
-    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
+    // Return HTML that does a client-side redirect (works better with WebBrowser on mobile)
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Redirecting to Epic...</title>
+        <meta http-equiv="refresh" content="0; url=${encodeURI(authUrl)}" />
+      </head>
+      <body>
+        <p>Redirecting to Epic authorization...</p>
+        <p><a href="${authUrl}">Click here if not redirected automatically</a></p>
+        <script>
+          window.location.href = "${authUrl}";
+        </script>
+      </body>
+      </html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.status(200).send(html);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
