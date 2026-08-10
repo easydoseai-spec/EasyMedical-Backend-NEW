@@ -407,6 +407,23 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     console.log('📥 Fetching patient data from Epic...');
 
+    // Decode JWT to get patient ID from fhirUser claim
+    let patientId = null;
+    try {
+      const parts = accessToken.split('.');
+      if (parts.length === 3) {
+        const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        console.log('Token decoded:', decoded);
+        if (decoded.fhirUser) {
+          // fhirUser is typically "Patient/12345"
+          patientId = decoded.fhirUser.split('/')[1];
+          console.log('Extracted patient ID from fhirUser:', patientId);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not decode token:', e.message);
+    }
+
     const FHIR_SERVER_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4';
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
@@ -414,24 +431,32 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     };
 
     // Fetch patient data in parallel
+    const patientQuery = patientId ? `${FHIR_SERVER_URL}/Patient/${patientId}` : `${FHIR_SERVER_URL}/Patient?_count=1`;
+    const medQuery = patientId ? `${FHIR_SERVER_URL}/Medication?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Medication?_count=100`;
+    const obsQuery = patientId ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Observation?_count=100`;
+    const procQuery = patientId ? `${FHIR_SERVER_URL}/Procedure?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Procedure?_count=100`;
+    const diagQuery = patientId ? `${FHIR_SERVER_URL}/DiagnosticReport?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
+
+    console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery });
+
     const [patientRes, medicationsRes, observationsRes, proceduresRes, diagnosticsRes] = await Promise.all([
-      fetch(`${FHIR_SERVER_URL}/Patient?_count=1`, { headers }).catch(e => {
+      fetch(patientQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Patient:', e);
         return null;
       }),
-      fetch(`${FHIR_SERVER_URL}/Medication?_count=100`, { headers }).catch(e => {
+      fetch(medQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Medication:', e);
         return null;
       }),
-      fetch(`${FHIR_SERVER_URL}/Observation?_count=100`, { headers }).catch(e => {
+      fetch(obsQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Observation:', e);
         return null;
       }),
-      fetch(`${FHIR_SERVER_URL}/Procedure?_count=100`, { headers }).catch(e => {
+      fetch(procQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Procedure:', e);
         return null;
       }),
-      fetch(`${FHIR_SERVER_URL}/DiagnosticReport?_count=100`, { headers }).catch(e => {
+      fetch(diagQuery, { headers }).catch(e => {
         console.warn('Failed to fetch DiagnosticReport:', e);
         return null;
       }),
@@ -445,10 +470,16 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     let diagnostics = [];
 
     if (patientRes?.ok) {
-      const patientBundle = await patientRes.json();
-      if (patientBundle.entry?.length > 0) {
-        patientData = patientBundle.entry[0].resource;
+      const patientJson = await patientRes.json();
+      // Handle both direct resource (when querying by ID) and bundle (when searching)
+      if (patientJson.resourceType === 'Patient') {
+        patientData = patientJson;
+      } else if (patientJson.entry?.length > 0) {
+        patientData = patientJson.entry[0].resource;
       }
+    } else if (patientRes) {
+      const errorText = await patientRes.text();
+      console.log(`Patient query failed with ${patientRes.status}:`, errorText);
     }
 
     if (medicationsRes?.ok) {
