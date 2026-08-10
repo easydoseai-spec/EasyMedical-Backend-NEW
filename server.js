@@ -413,11 +413,13 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       const parts = accessToken.split('.');
       if (parts.length === 3) {
         const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        console.log('Token decoded:', decoded);
+        console.log('Token decoded:', JSON.stringify(decoded, null, 2));
         if (decoded.fhirUser) {
           // fhirUser is typically "Patient/12345"
           patientId = decoded.fhirUser.split('/')[1];
           console.log('Extracted patient ID from fhirUser:', patientId);
+        } else {
+          console.warn('⚠️ No fhirUser claim found in token. Trying queries without patient filter.');
         }
       }
     } catch (e) {
@@ -431,11 +433,12 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     };
 
     // Fetch patient data in parallel
-    const patientQuery = patientId ? `${FHIR_SERVER_URL}/Patient/${patientId}` : `${FHIR_SERVER_URL}/Patient?_count=1`;
-    const medQuery = patientId ? `${FHIR_SERVER_URL}/Medication?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Medication?_count=100`;
-    const obsQuery = patientId ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Observation?_count=100`;
-    const procQuery = patientId ? `${FHIR_SERVER_URL}/Procedure?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/Procedure?_count=100`;
-    const diagQuery = patientId ? `${FHIR_SERVER_URL}/DiagnosticReport?patient=${patientId}&_count=100` : `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
+    // With patient/ scopes, Epic automatically filters to authenticated patient - no need for patient parameter
+    const patientQuery = `${FHIR_SERVER_URL}/Patient?_count=1`;
+    const medQuery = `${FHIR_SERVER_URL}/Medication?_count=100`;
+    const obsQuery = `${FHIR_SERVER_URL}/Observation?_count=100`;
+    const procQuery = `${FHIR_SERVER_URL}/Procedure?_count=100`;
+    const diagQuery = `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
 
     console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery });
 
