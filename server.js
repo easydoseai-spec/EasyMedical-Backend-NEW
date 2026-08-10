@@ -80,24 +80,26 @@ app.get('/api/auth/epic/authorize', (req, res) => {
 
     const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
+    console.log('🔗 Redirecting to:', authUrl);
 
     // Return HTML that does a client-side redirect (works better with WebBrowser on mobile)
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Redirecting to Epic...</title>
-        <meta http-equiv="refresh" content="0; url=${encodeURI(authUrl)}" />
-      </head>
-      <body>
-        <p>Redirecting to Epic authorization...</p>
-        <p><a href="${authUrl}">Click here if not redirected automatically</a></p>
-        <script>
-          window.location.href = "${authUrl}";
-        </script>
-      </body>
-      </html>
-    `;
+    // Properly escape the URL for HTML and JavaScript contexts
+    const escapedUrl = authUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const htmlEscapedUrl = authUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+<title>Redirecting to Epic...</title>
+</head>
+<body>
+<script>
+window.location.href = "${escapedUrl}";
+</script>
+<p>Redirecting to Epic authorization...</p>
+<p><a href="${htmlEscapedUrl}">Click here if not redirected</a></p>
+</body>
+</html>`;
 
     res.setHeader('Content-Type', 'text/html');
     res.status(200).send(html);
