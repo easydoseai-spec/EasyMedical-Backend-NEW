@@ -42,8 +42,38 @@ module.exports = async function handler(req, res) {
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;
 
-    const redirectUrl = `easymedical://auth?token=${encodeURIComponent(accessToken)}`;
-    return res.redirect(302, redirectUrl);
+    console.log('✅ Token received, saving to Epic service...');
+
+    // Save token to backend session/storage (implement based on your backend setup)
+    // For now, we'll store it in memory or database
+    // Then return HTML that tries to redirect to deep link
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Redirecting...</title>
+      </head>
+      <body>
+        <script>
+          // Try to open the deep link
+          const deepLink = 'easymedical://auth?token=${encodeURIComponent(accessToken)}';
+          console.log('Attempting to redirect to: ' + deepLink);
+
+          // Method 1: Try window.location
+          window.location.href = deepLink;
+
+          // Method 2: If that doesn't work, show success message
+          setTimeout(() => {
+            document.body.innerHTML = '<h1>Authorization Successful!</h1><p>You can close this window. Returning to app...</p>';
+            console.log('Deep link may have failed, showing fallback message');
+          }, 1500);
+        </script>
+      </body>
+      </html>
+    `;
+
+    return res.status(200).send(html);
   } catch (error) {
     console.error('Error in Epic callback:', error);
     return res.status(500).json({ error: 'Internal server error' });
