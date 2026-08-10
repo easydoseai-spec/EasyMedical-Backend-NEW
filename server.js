@@ -396,9 +396,104 @@ KEY POINTS: [bullet points]`;
   }
 });
 
+// Fetch patient data from Epic using the app's access token
+app.post('/api/auth/epic/patient-data', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Access token required' });
+    }
+
+    console.log('📥 Fetching patient data from Epic...');
+
+    const FHIR_SERVER_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4';
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/fhir+json',
+    };
+
+    // Fetch patient data in parallel
+    const [patientRes, medicationsRes, observationsRes, proceduresRes, diagnosticsRes] = await Promise.all([
+      fetch(`${FHIR_SERVER_URL}/Patient?_count=1`, { headers }).catch(e => {
+        console.warn('Failed to fetch Patient:', e);
+        return null;
+      }),
+      fetch(`${FHIR_SERVER_URL}/MedicationRequest?_count=100`, { headers }).catch(e => {
+        console.warn('Failed to fetch MedicationRequest:', e);
+        return null;
+      }),
+      fetch(`${FHIR_SERVER_URL}/Observation?_count=100`, { headers }).catch(e => {
+        console.warn('Failed to fetch Observation:', e);
+        return null;
+      }),
+      fetch(`${FHIR_SERVER_URL}/Procedure?_count=100`, { headers }).catch(e => {
+        console.warn('Failed to fetch Procedure:', e);
+        return null;
+      }),
+      fetch(`${FHIR_SERVER_URL}/DiagnosticReport?_count=100`, { headers }).catch(e => {
+        console.warn('Failed to fetch DiagnosticReport:', e);
+        return null;
+      }),
+    ]);
+
+    // Extract data from responses
+    let patientData = null;
+    let medications = [];
+    let observations = [];
+    let procedures = [];
+    let diagnostics = [];
+
+    if (patientRes?.ok) {
+      const patientBundle = await patientRes.json();
+      if (patientBundle.entry?.length > 0) {
+        patientData = patientBundle.entry[0].resource;
+      }
+    }
+
+    if (medicationsRes?.ok) {
+      const medBundle = await medicationsRes.json();
+      medications = medBundle.entry?.map(e => e.resource) || [];
+    }
+
+    if (observationsRes?.ok) {
+      const obsBundle = await observationsRes.json();
+      observations = obsBundle.entry?.map(e => e.resource) || [];
+    }
+
+    if (proceduresRes?.ok) {
+      const procBundle = await proceduresRes.json();
+      procedures = procBundle.entry?.map(e => e.resource) || [];
+    }
+
+    if (diagnosticsRes?.ok) {
+      const diagBundle = await diagnosticsRes.json();
+      diagnostics = diagBundle.entry?.map(e => e.resource) || [];
+    }
+
+    console.log(`✅ Fetched Epic data:
+      - Patient: ${patientData?.name?.[0]?.given?.[0] || 'Unknown'}
+      - Medications: ${medications.length}
+      - Observations: ${observations.length}
+      - Procedures: ${procedures.length}
+      - Diagnostics: ${diagnostics.length}`);
+
+    res.json({
+      patient: patientData,
+      medications,
+      observations,
+      procedures,
+      diagnostics,
+    });
+  } catch (error) {
+    console.error('❌ Error fetching patient data:', error);
+    res.status(500).json({ error: 'Failed to fetch patient data', details: error.message });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
-  res.json({ message: 'EasyMedical Backend API', routes: ['/api/chat', '/api/auth/epic/authorize', '/api/auth/epic/callback', '/api/vision/analyze-medication', '/api/vision/analyze-document', '/api/vision/analyze-record'] });
+  res.json({ message: 'EasyMedical Backend API', routes: ['/api/chat', '/api/auth/epic/authorize', '/api/auth/epic/callback', '/api/auth/epic/patient-data', '/api/vision/analyze-medication', '/api/vision/analyze-document', '/api/vision/analyze-record'] });
 });
 
 app.listen(PORT, () => {
