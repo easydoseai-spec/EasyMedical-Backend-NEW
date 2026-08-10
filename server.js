@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const Anthropic = require('@anthropic-ai/sdk');
 const { URLSearchParams } = require('url');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,8 +11,28 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// In-memory token storage (state -> token mapping)
-const tokenStorage = new Map();
+// File-based token storage (survives container restarts on Railway)
+const TOKEN_FILE = path.join('/tmp', 'epic_tokens.json');
+
+const getTokenStorage = () => {
+  try {
+    if (fs.existsSync(TOKEN_FILE)) {
+      const data = fs.readFileSync(TOKEN_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading token file:', error);
+  }
+  return {};
+};
+
+const saveTokenStorage = (tokens) => {
+  try {
+    fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2), 'utf8');
+  } catch (error) {
+    console.error('Error writing token file:', error);
+  }
+};
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -115,12 +137,14 @@ app.get('/api/auth/epic/callback', async (req, res) => {
     const tokenData = JSON.parse(responseText);
     const accessToken = tokenData.access_token;
 
-    // Store token with state as key (expires in 5 minutes)
-    tokenStorage.set(state, {
+    // Store token with state as key (file-based, survives restarts)
+    const tokens = getTokenStorage();
+    tokens[state] = {
       token: accessToken,
       tokenData: tokenData,
       timestamp: Date.now(),
-    });
+    };
+    saveTokenStorage(tokens);
 
     console.log('✅ Token stored with state:', state);
 
@@ -164,7 +188,8 @@ app.get('/api/auth/epic/token/:state', (req, res) => {
       return res.status(400).json({ error: 'State parameter is required' });
     }
 
-    const tokenEntry = tokenStorage.get(state);
+    const tokens = getTokenStorage();
+    const tokenEntry = tokens[state];
 
     if (!tokenEntry) {
       console.log('❌ Token not found for state:', state);
@@ -174,7 +199,8 @@ app.get('/api/auth/epic/token/:state', (req, res) => {
     // Check if token has expired (5 minutes)
     if (Date.now() - tokenEntry.timestamp > 5 * 60 * 1000) {
       console.log('❌ Token expired for state:', state);
-      tokenStorage.delete(state);
+      delete tokens[state];
+      saveTokenStorage(tokens);
       return res.status(410).json({ error: 'Token expired' });
     }
 
@@ -187,7 +213,8 @@ app.get('/api/auth/epic/token/:state', (req, res) => {
     });
 
     // Clean up token after retrieval
-    tokenStorage.delete(state);
+    delete tokens[state];
+    saveTokenStorage(tokens);
   } catch (error) {
     console.error('Error retrieving token:', error);
     res.status(500).json({ error: 'Internal server error' });
