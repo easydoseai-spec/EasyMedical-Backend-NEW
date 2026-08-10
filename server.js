@@ -75,7 +75,7 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
     params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
-    params.append('scope', 'openid fhirUser patient/Patient.read patient/MedicationRequest.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
+    params.append('scope', 'openid fhirUser patient/Patient.read patient/Medication.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
     params.append('state', state);
 
     console.log('✅ Authorization URL generated with state:', state);
@@ -419,8 +419,8 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
         console.warn('Failed to fetch Patient:', e);
         return null;
       }),
-      fetch(`${FHIR_SERVER_URL}/MedicationRequest?_count=100`, { headers }).catch(e => {
-        console.warn('Failed to fetch MedicationRequest:', e);
+      fetch(`${FHIR_SERVER_URL}/Medication?_count=100`, { headers }).catch(e => {
+        console.warn('Failed to fetch Medication:', e);
         return null;
       }),
       fetch(`${FHIR_SERVER_URL}/Observation?_count=100`, { headers }).catch(e => {
@@ -453,10 +453,10 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     if (medicationsRes?.ok) {
       const medBundle = await medicationsRes.json();
-      console.log('MedicationRequest bundle:', JSON.stringify(medBundle, null, 2));
+      console.log('Medication bundle:', JSON.stringify(medBundle, null, 2));
       medications = medBundle.entry?.map(e => e.resource) || [];
     } else {
-      console.log('MedicationRequest failed:', medicationsRes?.status);
+      console.log('Medication failed:', medicationsRes?.status);
     }
 
     if (observationsRes?.ok) {
