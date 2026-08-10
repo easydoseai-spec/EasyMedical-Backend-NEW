@@ -78,31 +78,8 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('scope', 'launch/patient openid fhirUser patient/Patient.read patient/Appointment.read patient/Medication.read patient/Condition.read patient/Observation.read');
     params.append('state', state);
 
-    const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
-    console.log('🔗 Redirecting to:', authUrl);
-
-    // Return HTML that does a client-side redirect (works better with WebBrowser on mobile)
-    // Properly escape the URL for HTML and JavaScript contexts
-    const escapedUrl = authUrl.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const htmlEscapedUrl = authUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-    const html = `<!DOCTYPE html>
-<html>
-<head>
-<title>Redirecting to Epic...</title>
-</head>
-<body>
-<script>
-window.location.href = "${escapedUrl}";
-</script>
-<p>Redirecting to Epic authorization...</p>
-<p><a href="${htmlEscapedUrl}">Click here if not redirected</a></p>
-</body>
-</html>`;
-
-    res.setHeader('Content-Type', 'text/html');
-    res.status(200).send(html);
+    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
