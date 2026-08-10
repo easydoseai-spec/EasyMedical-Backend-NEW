@@ -75,7 +75,7 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
     params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
-    params.append('scope', 'openid fhirUser patient/Patient.read patient/MedicationRequest.read');
+    params.append('scope', 'openid fhirUser patient/Patient.read patient/MedicationRequest.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
     params.append('state', state);
 
     console.log('✅ Authorization URL generated with state:', state);
