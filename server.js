@@ -319,31 +319,63 @@ app.post('/api/vision/analyze-document', async (req, res) => {
 
 app.post('/api/vision/analyze-record', async (req, res) => {
   try {
-    const { image } = req.body;
-    if (!image) {
-      return res.status(400).json({ error: 'Image is required' });
+    const { images, recordType } = req.body;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'At least one image is required' });
     }
+
+    const isLab = recordType === 'lab';
+
+    // Build content array with all images
+    const content = [];
+    images.forEach((image) => {
+      content.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: image,
+        },
+      });
+    });
+
+    // Add different prompts based on record type
+    let prompt;
+    if (isLab) {
+      prompt = `Please analyze these lab results and extract structured information including:
+- Test name(s)
+- All values and measurements
+- Units
+- Reference ranges
+- Status (normal/abnormal)
+- Any concerning findings
+
+Format as a detailed technical summary.`;
+    } else {
+      prompt = `Please analyze these medical records and provide:
+1. A short title (2-4 words) that summarizes the visit/record
+2. A one-paragraph summary of the visit/findings
+3. Key points or concerns identified
+
+Format as:
+TITLE: [title]
+SUMMARY: [one paragraph summary]
+KEY POINTS: [bullet points]`;
+    }
+
+    content.push({
+      type: 'text',
+      text: prompt,
+    });
 
     const response = await client.messages.create({
       model: 'claude-opus-5',
-      max_tokens: 800,
+      max_tokens: isLab ? 1000 : 500,
       messages: [
         {
           role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: image,
-              },
-            },
-            {
-              type: 'text',
-              text: 'Please analyze this health record/result and extract key information. Provide a clear summary including: what type of record this is, important values or measurements, reference ranges if shown, and any abnormal findings or concerns.',
-            },
-          ],
+          content: content,
         },
       ],
     });
@@ -356,6 +388,7 @@ app.post('/api/vision/analyze-record', async (req, res) => {
     res.json({
       success: true,
       analysis: textContent.text,
+      recordType: recordType,
     });
   } catch (error) {
     console.error('Record analysis error:', error);
