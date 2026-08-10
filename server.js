@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// In-memory token storage (state -> token mapping)
+const tokenStorage = new Map();
+
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -40,7 +43,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Epic OAuth authorize
+// Epic OAuth authorize - returns authorization URL and state
 app.get('/api/auth/epic/authorize', (req, res) => {
   try {
     const EPIC_OAUTH_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize';
@@ -49,12 +52,19 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     const params = new URLSearchParams();
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
-    params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend.vercel.app'}/api/auth/epic/callback`);
-    params.append('scope', 'openid fhirUser patient/Patient.read patient/MedicationRequest.read');
+    params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
+    params.append('scope', 'openid fhirUser patient/Patient.read patient/Appointment.read patient/AllergyIntolerance.read patient/Medication.read patient/Condition.read patient/DocumentReference.read patient/Immunization.read patient/Observation.read patient/Procedure.read fhirUser launch/patient openid');
     params.append('state', state);
 
-    res.setHeader('Set-Cookie', `epic_oauth_state=${state}; Path=/; HttpOnly; SameSite=Strict`);
-    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
+    const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
+
+    console.log('✅ Authorization URL generated with state:', state);
+
+    // Return both the URL and the state so the app can retrieve the token later
+    res.json({
+      authUrl: authUrl,
+      state: state,
+    });
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
@@ -103,12 +113,84 @@ app.get('/api/auth/epic/callback', async (req, res) => {
     }
 
     const tokenData = JSON.parse(responseText);
-    const redirectUrl = `easymedical://auth?token=${encodeURIComponent(tokenData.access_token)}`;
-    console.log('Token exchange successful, redirecting to app');
-    res.redirect(302, redirectUrl);
+    const accessToken = tokenData.access_token;
+
+    // Store token with state as key (expires in 5 minutes)
+    tokenStorage.set(state, {
+      token: accessToken,
+      tokenData: tokenData,
+      timestamp: Date.now(),
+    });
+
+    console.log('✅ Token stored with state:', state);
+
+    // Return HTML success page
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Authorization Successful</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+          .container { text-align: center; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          h1 { color: #007AFF; margin: 0; }
+          p { color: #666; margin: 12px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>✓ Authorization Successful!</h1>
+          <p>Your Epic account has been connected.</p>
+          <p>You can now close this window and return to the app.</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    res.status(200).send(html);
   } catch (error) {
     console.error('Callback error:', error);
     res.status(500).json({ error: 'Internal server error', message: error.message });
+  }
+});
+
+// Get Epic token by state
+app.get('/api/auth/epic/token/:state', (req, res) => {
+  try {
+    const { state } = req.params;
+    console.log('🔍 Retrieving token for state:', state);
+
+    if (!state) {
+      return res.status(400).json({ error: 'State parameter is required' });
+    }
+
+    const tokenEntry = tokenStorage.get(state);
+
+    if (!tokenEntry) {
+      console.log('❌ Token not found for state:', state);
+      return res.status(404).json({ error: 'Token not found or expired' });
+    }
+
+    // Check if token has expired (5 minutes)
+    if (Date.now() - tokenEntry.timestamp > 5 * 60 * 1000) {
+      console.log('❌ Token expired for state:', state);
+      tokenStorage.delete(state);
+      return res.status(410).json({ error: 'Token expired' });
+    }
+
+    console.log('✅ Token retrieved successfully');
+    res.json({
+      access_token: tokenEntry.token,
+      token_type: tokenEntry.tokenData.token_type,
+      expires_in: tokenEntry.tokenData.expires_in,
+      scope: tokenEntry.tokenData.scope,
+    });
+
+    // Clean up token after retrieval
+    tokenStorage.delete(state);
+  } catch (error) {
+    console.error('Error retrieving token:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
