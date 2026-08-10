@@ -453,22 +453,34 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     if (medicationsRes?.ok) {
       const medBundle = await medicationsRes.json();
+      console.log('MedicationRequest bundle:', JSON.stringify(medBundle, null, 2));
       medications = medBundle.entry?.map(e => e.resource) || [];
+    } else {
+      console.log('MedicationRequest failed:', medicationsRes?.status);
     }
 
     if (observationsRes?.ok) {
       const obsBundle = await observationsRes.json();
+      console.log('Observation bundle:', JSON.stringify(obsBundle, null, 2));
       observations = obsBundle.entry?.map(e => e.resource) || [];
+    } else {
+      console.log('Observation failed:', observationsRes?.status);
     }
 
     if (proceduresRes?.ok) {
       const procBundle = await proceduresRes.json();
+      console.log('Procedure bundle:', JSON.stringify(procBundle, null, 2));
       procedures = procBundle.entry?.map(e => e.resource) || [];
+    } else {
+      console.log('Procedure failed:', proceduresRes?.status);
     }
 
     if (diagnosticsRes?.ok) {
       const diagBundle = await diagnosticsRes.json();
+      console.log('DiagnosticReport bundle:', JSON.stringify(diagBundle, null, 2));
       diagnostics = diagBundle.entry?.map(e => e.resource) || [];
+    } else {
+      console.log('DiagnosticReport failed:', diagnosticsRes?.status);
     }
 
     console.log(`✅ Fetched Epic data:
