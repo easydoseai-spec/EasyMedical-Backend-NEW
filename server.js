@@ -65,7 +65,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Epic OAuth authorize - returns authorization URL and state
+// Epic OAuth authorize - redirects to Epic's OAuth endpoint
 app.get('/api/auth/epic/authorize', (req, res) => {
   try {
     const EPIC_OAUTH_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize';
@@ -78,15 +78,10 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('scope', 'launch/patient openid fhirUser patient/Patient.read patient/Appointment.read patient/Medication.read patient/Condition.read patient/Observation.read');
     params.append('state', state);
 
-    const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
-
     console.log('✅ Authorization URL generated with state:', state);
 
-    // Return both the URL and the state so the app can retrieve the token later
-    res.json({
-      authUrl: authUrl,
-      state: state,
-    });
+    // Redirect to Epic's OAuth endpoint
+    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
