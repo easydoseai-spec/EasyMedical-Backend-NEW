@@ -53,7 +53,7 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
     params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
-    params.append('scope', 'openid fhirUser patient/Patient.read patient/Appointment.read patient/AllergyIntolerance.read patient/Medication.read patient/Condition.read patient/DocumentReference.read patient/Immunization.read patient/Observation.read patient/Procedure.read fhirUser launch/patient openid');
+    params.append('scope', 'launch/patient openid fhirUser patient/Patient.read patient/Appointment.read patient/Medication.read patient/Condition.read patient/Observation.read');
     params.append('state', state);
 
     const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
