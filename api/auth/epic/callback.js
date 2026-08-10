@@ -21,13 +21,15 @@ module.exports = async function handler(req, res) {
     params.append('grant_type', 'authorization_code');
     params.append('code', code);
     params.append('redirect_uri', `${BACKEND_URL}/api/auth/epic/callback`);
-    params.append('client_id', EPIC_CLIENT_ID || '');
-    params.append('client_secret', EPIC_CLIENT_SECRET || '');
+
+    // Create Basic Auth header for confidential clients
+    const authHeader = 'Basic ' + Buffer.from(`${EPIC_CLIENT_ID}:${EPIC_CLIENT_SECRET}`).toString('base64');
 
     const tokenResponse = await fetch(EPIC_TOKEN_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': authHeader,
       },
       body: params.toString(),
     });
