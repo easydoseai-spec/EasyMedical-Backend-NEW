@@ -388,15 +388,26 @@ MUST HAVES:
 - Return at least 20 total tests
 - If you find fewer than 15 tests, re-read the entire image again before responding`;
     } else {
-      prompt = `Please analyze these medical records and provide:
-1. A short title (2-4 words) that summarizes the visit/record
-2. A one-paragraph summary of the visit/findings
-3. Key points or concerns identified
+      prompt = `Extract the following information from this medical record:
 
-Format as:
-TITLE: [title]
+1. DOCTOR NAME: Find and extract the doctor's or provider's name
+2. REASON FOR VISIT: Summarize the reason/purpose in exactly 3 words (e.g., "Established patient visit", "Annual physical exam", "Follow-up appointment")
+3. SUMMARY: A one-paragraph summary of the visit/findings
+
+Format exactly as:
+DOCTOR: [doctor's full name or provider name]
+REASON: [exactly 3 words describing the visit purpose]
 SUMMARY: [one paragraph summary]
-KEY POINTS: [bullet points]`;
+KEY POINTS: [list the main concerns or findings]
+
+Example:
+DOCTOR: Dr. John Smith
+REASON: Established patient visit
+SUMMARY: 45-year-old male came for routine check-up. Vital signs normal. Patient reports no acute complaints.
+KEY POINTS:
+- Blood pressure: 120/80 (normal)
+- Weight: stable
+- No new medical concerns`;
     }
 
     content.push({
