@@ -345,15 +345,48 @@ app.post('/api/vision/analyze-record', async (req, res) => {
     // Add different prompts based on record type
     let prompt;
     if (isLab) {
-      prompt = `Please analyze these lab results and extract structured information including:
-- Test name(s)
-- All values and measurements
-- Units
-- Reference ranges
-- Status (normal/abnormal)
-- Any concerning findings
+      prompt = `CRITICAL: Extract EVERY SINGLE lab test from this LabCorp report. There are typically 14+ tests in the CMP and 5+ in the Lipid Panel. DO NOT STOP until you've found them all.
 
-Format as a detailed technical summary.`;
+Step 1: Find and extract the DATE COLLECTED
+Step 2: Extract EVERY test from the Comp. Metabolic Panel table (look for rows with: Glucose, BUN, Creatinine, eGFR, Sodium, Potassium, Chloride, Calcium, Protein, Albumin, Globulin, Bilirubin, Phosphatase, AST, ALT, etc.)
+Step 3: Extract EVERY test from the Lipid Panel table (look for: Cholesterol, Triglycerides, HDL, VLDL, LDL)
+Step 4: Verify you found at least 14 CMP tests and 5 Lipid Panel tests (20+ total)
+
+OUTPUT FORMAT:
+Date Collected: MM/DD/YYYY
+TEST_COUNT: XX (e.g., "TEST_COUNT: 22")
+Glucose: 98 (70-99)
+BUN: 18 (6-20)
+Creatinine: 0.98 (0.76-1.27)
+eGFR: 106 (>59)
+BUN/Creatinine Ratio: 18 (9-20)
+Sodium: 141 (134-144)
+Potassium: 4.8 (3.5-5.2)
+Chloride: 104 (96-106)
+Carbon Dioxide, Total: 23 (20-29)
+Calcium: 10.0 (8.7-10.2)
+Protein, Total: 7.0 (6.0-8.5)
+Albumin: 4.7 (4.3-5.2)
+Globulin, Total: 2.3 (1.5-4.5)
+Bilirubin, Total: 0.3 (0.0-1.2)
+Alkaline Phosphatase: 57 (44-121)
+AST (SGOT): 29 (0-40)
+ALT (SGPT): 35 (0-44)
+Cholesterol, Total: 215 (100-199)
+Triglycerides: 104 (0-149)
+HDL Cholesterol: 55 (>39)
+VLDL Cholesterol: 18 (5-40)
+LDL Chol Calc (NIH): 142 (0-99)
+
+MUST HAVES:
+- Always start with Date Collected
+- Always include TEST_COUNT showing total tests extracted
+- READ EVERY TABLE ROW COMPLETELY
+- Do not stop after CMP - continue to Lipid Panel
+- For each test: Name: Value (Reference Range)
+- Reference ranges from the "Reference Interval" column
+- Return at least 20 total tests
+- If you find fewer than 15 tests, re-read the entire image again before responding`;
     } else {
       prompt = `Please analyze these medical records and provide:
 1. A short title (2-4 words) that summarizes the visit/record
