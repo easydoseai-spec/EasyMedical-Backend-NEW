@@ -43,15 +43,22 @@ const client = new Anthropic({
 // Chat endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body;
+    const { messages, hasMedicalContext } = req.body;
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: 'Messages array is required' });
+    }
+
+    let systemPrompt = 'You are a health education assistant. Provide concise, clear health information (2-3 sentences max). Use plain text only - no markdown formatting, no #, **, -, or bullet points. Be helpful but remind users this is educational information only and not a substitute for professional medical advice.';
+
+    // If medical context is provided, use a more personalized prompt
+    if (hasMedicalContext) {
+      systemPrompt = 'You are a health education assistant with access to the patient\'s medical records. Answer questions by referencing their specific records when relevant. Provide concise, clear health information (2-3 sentences max). Use plain text only - no markdown formatting, no #, **, -, or bullet points. Be helpful but remind users this is educational information only and not a substitute for professional medical advice. Always encourage the patient to discuss findings with their healthcare provider.';
     }
 
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 300,
-      system: 'You are a health education assistant. Provide concise, clear health information (2-3 sentences max). Use plain text only - no markdown formatting, no #, **, -, or bullet points. Be helpful but remind users this is educational information only and not a substitute for professional medical advice.',
+      system: systemPrompt,
       messages: messages,
     });
 
@@ -67,7 +74,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Epic OAuth authorize - returns HTML that redirects to Epic's OAuth endpoint
+// Epic OAuth authorize - returns authorization URL and state
 app.get('/api/auth/epic/authorize', (req, res) => {
   try {
     const EPIC_OAUTH_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize';
@@ -80,8 +87,14 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('scope', 'openid fhirUser patient/Patient.read patient/Medication.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
     params.append('state', state);
 
+    const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
-    res.redirect(302, `${EPIC_OAUTH_URL}?${params.toString()}`);
+
+    // Return both URL and state so frontend can manage the flow
+    res.json({
+      url: authUrl,
+      state: state,
+    });
   } catch (error) {
     console.error('OAuth error:', error);
     res.status(500).json({ error: 'Failed to initiate OAuth' });
@@ -388,26 +401,31 @@ MUST HAVES:
 - Return at least 20 total tests
 - If you find fewer than 15 tests, re-read the entire image again before responding`;
     } else {
-      prompt = `Extract the following information from this medical record:
+      prompt = `CRITICAL: Extract EXACTLY this information from the medical record:
 
-1. DOCTOR NAME: Find and extract the doctor's or provider's name
-2. REASON FOR VISIT: Summarize the reason/purpose in exactly 3 words (e.g., "Established patient visit", "Annual physical exam", "Follow-up appointment")
-3. SUMMARY: A one-paragraph summary of the visit/findings
+1. APPOINTMENT DATE: The date when the appointment/visit happened (MM/DD/YYYY format)
+2. DOCTOR: The doctor's or provider's full name
+3. REASON: Summarize the visit reason in exactly 3 words
+4. SUMMARY: One paragraph summary of the visit/findings
 
-Format exactly as:
-DOCTOR: [doctor's full name or provider name]
-REASON: [exactly 3 words describing the visit purpose]
-SUMMARY: [one paragraph summary]
-KEY POINTS: [list the main concerns or findings]
+Return in this EXACT format:
+APPOINTMENT DATE: MM/DD/YYYY
+DOCTOR: [name]
+REASON: [3 words]
+SUMMARY: [paragraph]
+KEY POINTS: [list]
 
-Example:
+EXAMPLE:
+APPOINTMENT DATE: 01/15/2026
 DOCTOR: Dr. John Smith
 REASON: Established patient visit
 SUMMARY: 45-year-old male came for routine check-up. Vital signs normal. Patient reports no acute complaints.
 KEY POINTS:
 - Blood pressure: 120/80 (normal)
 - Weight: stable
-- No new medical concerns`;
+- No new medical concerns
+
+Make sure to find and include the appointment date from the document header or top of the record.`;
     }
 
     content.push({
