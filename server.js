@@ -150,17 +150,40 @@ app.get('/api/auth/epic/callback', async (req, res) => {
 
     const tokenData = JSON.parse(responseText);
     const accessToken = tokenData.access_token;
+    const idToken = tokenData.id_token;
+
+    // Extract patient ID from response or id_token
+    let patientId = null;
+    if (tokenData.patient) {
+      patientId = tokenData.patient;
+      console.log('✅ Patient ID from response:', patientId);
+    } else if (idToken) {
+      try {
+        const parts = idToken.split('.');
+        if (parts.length === 3) {
+          const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          if (decoded.fhirUser) {
+            patientId = decoded.fhirUser.split('/').pop();
+            console.log('✅ Patient ID from id_token fhirUser:', patientId);
+          }
+        }
+      } catch (e) {
+        console.warn('Could not decode id_token:', e.message);
+      }
+    }
 
     // Store token with state as key (file-based, survives restarts)
     const tokens = getTokenStorage();
     tokens[state] = {
       token: accessToken,
       tokenData: tokenData,
+      patientId: patientId,
       timestamp: Date.now(),
     };
     saveTokenStorage(tokens);
 
     console.log('✅ Token stored with state:', state);
+    console.log('   Patient ID stored:', patientId || 'Not available');
 
     // Return HTML success page
     const html = `
@@ -224,6 +247,7 @@ app.get('/api/auth/epic/token/:state', (req, res) => {
       token_type: tokenEntry.tokenData.token_type,
       expires_in: tokenEntry.tokenData.expires_in,
       scope: tokenEntry.tokenData.scope,
+      patient: tokenEntry.patientId,
     });
 
     // Clean up token after retrieval
