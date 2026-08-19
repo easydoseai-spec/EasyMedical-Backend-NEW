@@ -497,14 +497,29 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     };
 
     // Fetch patient data in parallel
-    // With patient/ scopes, Epic automatically filters to authenticated patient - no need for patient parameter
-    const patientQuery = `${FHIR_SERVER_URL}/Patient?_count=1`;
-    const medQuery = `${FHIR_SERVER_URL}/Medication?_count=100`;
-    const obsQuery = `${FHIR_SERVER_URL}/Observation?_count=100`;
-    const procQuery = `${FHIR_SERVER_URL}/Procedure?_count=100`;
-    const diagQuery = `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
+    // Use patient ID from token if available, otherwise use queries without filter
+    const patientQuery = patientId
+      ? `${FHIR_SERVER_URL}/Patient/${patientId}`
+      : `${FHIR_SERVER_URL}/Patient?_count=1`;
+
+    const medQuery = patientId
+      ? `${FHIR_SERVER_URL}/MedicationRequest?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/MedicationRequest?_count=100`;
+
+    const obsQuery = patientId
+      ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/Observation?_count=100`;
+
+    const procQuery = patientId
+      ? `${FHIR_SERVER_URL}/Procedure?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/Procedure?_count=100`;
+
+    const diagQuery = patientId
+      ? `${FHIR_SERVER_URL}/DiagnosticReport?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
 
     console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery });
+    console.log('Using patient ID:', patientId || 'None - using global queries');
 
     const [patientRes, medicationsRes, observationsRes, proceduresRes, diagnosticsRes] = await Promise.all([
       fetch(patientQuery, { headers }).catch(e => {
