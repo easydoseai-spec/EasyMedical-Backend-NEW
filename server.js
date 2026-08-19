@@ -581,8 +581,8 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       : `${FHIR_SERVER_URL}/Patient?_count=1`;
 
     const medQuery = patientId
-      ? `${FHIR_SERVER_URL}/MedicationRequest?patient=${patientId}&_count=100`
-      : `${FHIR_SERVER_URL}/MedicationRequest?_count=100`;
+      ? `${FHIR_SERVER_URL}/MedicationRequest?patient=${patientId}&status=active`
+      : `${FHIR_SERVER_URL}/MedicationRequest?status=active`;
 
     const obsQuery = patientId
       ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&category=laboratory&_count=100`
