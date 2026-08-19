@@ -104,6 +104,9 @@ app.get('/api/auth/epic/authorize', (req, res) => {
   }
 });
 
+// Track processed authorization codes to prevent reuse
+const processedCodes = new Set();
+
 // Epic OAuth callback
 app.get('/api/auth/epic/callback', async (req, res) => {
   try {
@@ -114,6 +117,34 @@ app.get('/api/auth/epic/callback', async (req, res) => {
       console.error('Missing code or state');
       return res.status(400).json({ error: 'Missing code or state' });
     }
+
+    // Prevent authorization code reuse
+    if (processedCodes.has(code)) {
+      console.warn('⚠️ Authorization code already processed:', code.substring(0, 20) + '...');
+      return res.status(200).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Authorization Already Processed</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f5f5f5; }
+            .container { text-align: center; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            h1 { color: #007AFF; margin: 0; }
+            p { color: #666; margin: 12px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h1>✓ Already Authorized</h1>
+            <p>Your Epic account has already been connected.</p>
+            <p>You can close this window and return to the app.</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
+    processedCodes.add(code);
 
     const EPIC_TOKEN_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token';
     const redirectUri = `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`;
