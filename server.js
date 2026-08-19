@@ -121,9 +121,9 @@ app.get('/api/auth/epic/callback', async (req, res) => {
     console.log('Exchanging code for token...');
     console.log('Redirect URI:', redirectUri);
     console.log('BACKEND_URL env var:', process.env.BACKEND_URL || 'NOT SET (using default)');
-    console.log('Client ID:', process.env.EPIC_CLIENT_ID ? 'set' : 'NOT SET');
-    console.log('Client Secret:', process.env.EPIC_CLIENT_SECRET ? 'set' : 'NOT SET');
-    console.log('Authorization code:', code ? code.substring(0, 20) + '...' : 'MISSING');
+    console.log('Client ID (first 20 chars):', process.env.EPIC_CLIENT_ID ? process.env.EPIC_CLIENT_ID.substring(0, 20) + '...' : 'NOT SET');
+    console.log('Client Secret (first 10 chars):', process.env.EPIC_CLIENT_SECRET ? process.env.EPIC_CLIENT_SECRET.substring(0, 10) + '...' : 'NOT SET');
+    console.log('Authorization code (first 20 chars):', code ? code.substring(0, 20) + '...' : 'MISSING');
     console.log('State:', state);
 
     const params = new URLSearchParams();
