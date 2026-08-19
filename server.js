@@ -599,13 +599,17 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     }
 
     if (medicationsRes?.ok) {
-      const medBundle = await medicationsRes.json();
-      console.log('Medication bundle:', JSON.stringify(medBundle, null, 2));
-      medications = medBundle.entry?.map(e => e.resource) || [];
+      try {
+        const medBundle = await medicationsRes.json();
+        console.log('Medication bundle entries:', medBundle.entry?.length || 0);
+        medications = medBundle.entry?.map(e => e.resource) || [];
+      } catch (e) {
+        console.error('❌ Failed to parse Medication response:', e.message);
+      }
     } else if (medicationsRes) {
       const errorText = await medicationsRes.text();
       console.log(`❌ Medication query failed with ${medicationsRes.status}`);
-      console.log('   Error body:', errorText);
+      console.log('   Error body:', errorText.substring(0, 200));
       console.log('   Query URL:', medQuery);
       console.log('   Authorization header:', headers.Authorization ? 'Present' : 'Missing');
     }
