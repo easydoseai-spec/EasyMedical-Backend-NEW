@@ -471,7 +471,7 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     console.log('📥 Fetching patient data from Epic...');
 
-    // Decode JWT to get patient ID from fhirUser claim
+    // Decode JWT to get patient ID from fhirUser or sub claim
     let patientId = null;
     try {
       const parts = accessToken.split('.');
@@ -481,9 +481,13 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
         if (decoded.fhirUser) {
           // fhirUser is typically "Patient/12345"
           patientId = decoded.fhirUser.split('/')[1];
-          console.log('Extracted patient ID from fhirUser:', patientId);
+          console.log('✅ Extracted patient ID from fhirUser:', patientId);
+        } else if (decoded.sub) {
+          // Fallback to sub claim if fhirUser not available
+          console.warn('⚠️ No fhirUser claim, using sub as patient ID:', decoded.sub);
+          patientId = decoded.sub;
         } else {
-          console.warn('⚠️ No fhirUser claim found in token. Trying queries without patient filter.');
+          console.warn('⚠️ No fhirUser or sub claim found in token. Trying queries without patient filter.');
         }
       }
     } catch (e) {
@@ -570,7 +574,10 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       medications = medBundle.entry?.map(e => e.resource) || [];
     } else if (medicationsRes) {
       const errorText = await medicationsRes.text();
-      console.log(`❌ Medication query failed with ${medicationsRes.status}:`, errorText);
+      console.log(`❌ Medication query failed with ${medicationsRes.status}`);
+      console.log('   Error body:', errorText);
+      console.log('   Query URL:', medQuery);
+      console.log('   Authorization header:', headers.Authorization ? 'Present' : 'Missing');
     }
 
     if (observationsRes?.ok) {
