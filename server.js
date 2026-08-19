@@ -585,8 +585,8 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       : `${FHIR_SERVER_URL}/MedicationRequest?_count=100`;
 
     const obsQuery = patientId
-      ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&_count=100`
-      : `${FHIR_SERVER_URL}/Observation?_count=100`;
+      ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&category=laboratory&_count=100`
+      : `${FHIR_SERVER_URL}/Observation?category=laboratory&_count=100`;
 
     const procQuery = patientId
       ? `${FHIR_SERVER_URL}/Procedure?patient=${patientId}&_count=100`
@@ -653,7 +653,10 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     } else if (medicationsRes) {
       const errorText = await medicationsRes.text();
       console.log(`❌ Medication query failed with ${medicationsRes.status}`);
-      console.log('   Error body:', errorText.substring(0, 200));
+      if (medicationsRes.status === 403) {
+        console.log('   ⚠️ Access denied (403) - The access token may not have permission for Medications');
+      }
+      console.log('   Error body:', errorText.substring(0, 300));
       console.log('   Query URL:', medQuery);
       console.log('   Authorization header:', headers.Authorization ? 'Present' : 'Missing');
     }
