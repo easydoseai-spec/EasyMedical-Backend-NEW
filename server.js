@@ -584,9 +584,18 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       ? `${FHIR_SERVER_URL}/MedicationRequest?patient=${patientId}&status=active`
       : `${FHIR_SERVER_URL}/MedicationRequest?status=active`;
 
-    const obsQuery = patientId
+    // Query for laboratory observations
+    const labQuery = patientId
       ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&category=laboratory&_count=100`
       : `${FHIR_SERVER_URL}/Observation?category=laboratory&_count=100`;
+
+    // Query for vital signs observations
+    const vitalSignsQuery = patientId
+      ? `${FHIR_SERVER_URL}/Observation?patient=${patientId}&category=vital-signs&_count=100`
+      : `${FHIR_SERVER_URL}/Observation?category=vital-signs&_count=100`;
+
+    // Use lab query for now, will add vital signs separately
+    const obsQuery = labQuery;
 
     const procQuery = patientId
       ? `${FHIR_SERVER_URL}/Procedure?patient=${patientId}&_count=100`
@@ -599,7 +608,7 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery });
     console.log('Using patient ID:', patientId || 'None - using global queries');
 
-    const [patientRes, medicationsRes, observationsRes, proceduresRes, diagnosticsRes] = await Promise.all([
+    const [patientRes, medicationsRes, observationsRes, vitalSignsRes, proceduresRes, diagnosticsRes] = await Promise.all([
       fetch(patientQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Patient:', e);
         return null;
@@ -610,6 +619,10 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       }),
       fetch(obsQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Observation:', e);
+        return null;
+      }),
+      fetch(vitalSignsQuery, { headers }).catch(e => {
+        console.warn('Failed to fetch Vital Signs:', e);
         return null;
       }),
       fetch(procQuery, { headers }).catch(e => {
@@ -668,6 +681,18 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     } else if (observationsRes) {
       const errorText = await observationsRes.text();
       console.log(`❌ Observation query failed with ${observationsRes.status}:`, errorText);
+    }
+
+    // Add vital signs to observations
+    if (vitalSignsRes?.ok) {
+      const vitalBundle = await vitalSignsRes.json();
+      console.log('Vital Signs bundle entries:', vitalBundle.entry?.length || 0);
+      const vitalSigns = vitalBundle.entry?.map(e => e.resource) || [];
+      observations = [...observations, ...vitalSigns];
+      console.log('Total observations (labs + vitals):', observations.length);
+    } else if (vitalSignsRes) {
+      const errorText = await vitalSignsRes.text();
+      console.log(`❌ Vital Signs query failed with ${vitalSignsRes.status}`);
     }
 
     if (proceduresRes?.ok) {
