@@ -537,26 +537,28 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     if (patientId) {
       console.log('✅ Using provided patient ID:', patientId);
-    }
-    try {
-      const parts = accessToken.split('.');
-      if (parts.length === 3) {
-        const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-        console.log('Token decoded:', JSON.stringify(decoded, null, 2));
-        if (decoded.fhirUser) {
-          // fhirUser is typically "Patient/12345"
-          patientId = decoded.fhirUser.split('/')[1];
-          console.log('✅ Extracted patient ID from fhirUser:', patientId);
-        } else if (decoded.sub) {
-          // Fallback to sub claim if fhirUser not available
-          console.warn('⚠️ No fhirUser claim, using sub as patient ID:', decoded.sub);
-          patientId = decoded.sub;
-        } else {
-          console.warn('⚠️ No fhirUser or sub claim found in token. Trying queries without patient filter.');
+    } else {
+      // Only decode token if we don't have a provided patient ID
+      try {
+        const parts = accessToken.split('.');
+        if (parts.length === 3) {
+          const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+          console.log('Token decoded:', JSON.stringify(decoded, null, 2));
+          if (decoded.fhirUser) {
+            // fhirUser is typically "Patient/12345"
+            patientId = decoded.fhirUser.split('/')[1];
+            console.log('✅ Extracted patient ID from fhirUser:', patientId);
+          } else if (decoded.sub) {
+            // Fallback to sub claim if fhirUser not available
+            console.warn('⚠️ No fhirUser claim, using sub as patient ID:', decoded.sub);
+            patientId = decoded.sub;
+          } else {
+            console.warn('⚠️ No fhirUser or sub claim found in token. Trying queries without patient filter.');
+          }
         }
+      } catch (e) {
+        console.warn('Could not decode token:', e.message);
       }
-    } catch (e) {
-      console.warn('Could not decode token:', e.message);
     }
 
     const FHIR_SERVER_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4';
