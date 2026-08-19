@@ -79,16 +79,19 @@ app.get('/api/auth/epic/authorize', (req, res) => {
   try {
     const EPIC_OAUTH_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize';
     const state = Math.random().toString(36).substring(7);
+    const redirectUri = `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`;
 
     const params = new URLSearchParams();
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
-    params.append('redirect_uri', `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`);
+    params.append('redirect_uri', redirectUri);
     params.append('scope', 'openid fhirUser patient/Patient.read patient/Medication.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
     params.append('state', state);
 
     const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
     console.log('✅ Authorization URL generated with state:', state);
+    console.log('   Redirect URI:', redirectUri);
+    console.log('   BACKEND_URL env:', process.env.BACKEND_URL || 'NOT SET (using default)');
 
     // Return both URL and state so frontend can manage the flow
     res.json({
@@ -117,8 +120,11 @@ app.get('/api/auth/epic/callback', async (req, res) => {
 
     console.log('Exchanging code for token...');
     console.log('Redirect URI:', redirectUri);
+    console.log('BACKEND_URL env var:', process.env.BACKEND_URL || 'NOT SET (using default)');
     console.log('Client ID:', process.env.EPIC_CLIENT_ID ? 'set' : 'NOT SET');
     console.log('Client Secret:', process.env.EPIC_CLIENT_SECRET ? 'set' : 'NOT SET');
+    console.log('Authorization code:', code ? code.substring(0, 20) + '...' : 'MISSING');
+    console.log('State:', state);
 
     const params = new URLSearchParams();
     params.append('grant_type', 'authorization_code');
