@@ -493,7 +493,7 @@ Make sure to find and include the appointment date from the document header or t
 // Fetch patient data from Epic using the app's access token
 app.post('/api/auth/epic/patient-data', async (req, res) => {
   try {
-    const { accessToken } = req.body;
+    const { accessToken, patientId: providedPatientId } = req.body;
 
     if (!accessToken) {
       return res.status(400).json({ error: 'Access token required' });
@@ -501,8 +501,12 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     console.log('📥 Fetching patient data from Epic...');
 
-    // Decode JWT to get patient ID from fhirUser or sub claim
-    let patientId = null;
+    // Use provided patient ID or decode JWT to get patient ID from fhirUser or sub claim
+    let patientId = providedPatientId || null;
+
+    if (patientId) {
+      console.log('✅ Using provided patient ID:', patientId);
+    }
     try {
       const parts = accessToken.split('.');
       if (parts.length === 3) {
@@ -528,7 +532,14 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/fhir+json',
+      'Accept': 'application/fhir+json',
     };
+
+    console.log('Making FHIR requests with headers:', {
+      Authorization: 'Bearer ' + accessToken.substring(0, 30) + '...',
+      'Content-Type': headers['Content-Type'],
+      'Accept': headers['Accept'],
+    });
 
     // Fetch patient data in parallel
     // Use patient ID from token if available, otherwise use queries without filter
