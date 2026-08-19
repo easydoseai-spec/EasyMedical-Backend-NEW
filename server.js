@@ -113,7 +113,7 @@ app.get('/api/auth/epic/callback', async (req, res) => {
     }
 
     const EPIC_TOKEN_URL = 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token';
-    const redirectUri = `${process.env.BACKEND_URL || 'https://easymedical-backend.vercel.app'}/api/auth/epic/callback`;
+    const redirectUri = `${process.env.BACKEND_URL || 'https://easymedical-backend-new-production.up.railway.app'}/api/auth/epic/callback`;
 
     console.log('Exchanging code for token...');
     console.log('Redirect URI:', redirectUri);
