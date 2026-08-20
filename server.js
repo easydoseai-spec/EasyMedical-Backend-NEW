@@ -85,7 +85,7 @@ app.get('/api/auth/epic/authorize', (req, res) => {
     params.append('client_id', process.env.EPIC_CLIENT_ID || '');
     params.append('response_type', 'code');
     params.append('redirect_uri', redirectUri);
-    params.append('scope', 'openid fhirUser patient/Patient.read patient/Medication.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read');
+    params.append('scope', 'openid fhirUser patient/Patient.read patient/Medication.read patient/Observation.read patient/Procedure.read patient/DiagnosticReport.read patient/AllergyIntolerance.read patient/Condition.read patient/Appointment.read patient/Immunization.read');
     params.append('state', state);
 
     const authUrl = `${EPIC_OAUTH_URL}?${params.toString()}`;
@@ -605,10 +605,18 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       ? `${FHIR_SERVER_URL}/DiagnosticReport?patient=${patientId}&_count=100`
       : `${FHIR_SERVER_URL}/DiagnosticReport?_count=100`;
 
-    console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery });
+    const condQuery = patientId
+      ? `${FHIR_SERVER_URL}/Condition?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/Condition?_count=100`;
+
+    const allergyQuery = patientId
+      ? `${FHIR_SERVER_URL}/AllergyIntolerance?patient=${patientId}&_count=100`
+      : `${FHIR_SERVER_URL}/AllergyIntolerance?_count=100`;
+
+    console.log('Query URLs:', { patientQuery, medQuery, obsQuery, procQuery, diagQuery, condQuery, allergyQuery });
     console.log('Using patient ID:', patientId || 'None - using global queries');
 
-    const [patientRes, medicationsRes, observationsRes, vitalSignsRes, proceduresRes, diagnosticsRes] = await Promise.all([
+    const [patientRes, medicationsRes, observationsRes, vitalSignsRes, proceduresRes, diagnosticsRes, conditionsRes, allergiesRes] = await Promise.all([
       fetch(patientQuery, { headers }).catch(e => {
         console.warn('Failed to fetch Patient:', e);
         return null;
@@ -633,6 +641,14 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
         console.warn('Failed to fetch DiagnosticReport:', e);
         return null;
       }),
+      fetch(condQuery, { headers }).catch(e => {
+        console.warn('Failed to fetch Condition:', e);
+        return null;
+      }),
+      fetch(allergyQuery, { headers }).catch(e => {
+        console.warn('Failed to fetch AllergyIntolerance:', e);
+        return null;
+      }),
     ]);
 
     // Extract data from responses
@@ -641,6 +657,8 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     let observations = [];
     let procedures = [];
     let diagnostics = [];
+    let conditions = [];
+    let allergies = [];
 
     if (patientRes?.ok) {
       const patientJson = await patientRes.json();
@@ -732,12 +750,48 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       console.log(`❌ DiagnosticReport query failed with ${diagnosticsRes.status}:`, errorText);
     }
 
+    if (conditionsRes?.ok) {
+      const condBundle = await conditionsRes.json();
+      console.log('Condition bundle entries:', condBundle.entry?.length || 0);
+      conditions = condBundle.entry?.map(e => {
+        const resource = e.resource;
+        return {
+          id: resource.id,
+          name: resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown',
+          onsetDate: resource.onsetDateTime || resource.onsetDate || '',
+          status: resource.clinicalStatus?.coding?.[0]?.code || resource.verificationStatus?.coding?.[0]?.code || 'unknown',
+        };
+      }) || [];
+    } else if (conditionsRes) {
+      const errorText = await conditionsRes.text();
+      console.log(`❌ Condition query failed with ${conditionsRes.status}`);
+    }
+
+    if (allergiesRes?.ok) {
+      const allergyBundle = await allergiesRes.json();
+      console.log('AllergyIntolerance bundle entries:', allergyBundle.entry?.length || 0);
+      allergies = allergyBundle.entry?.map(e => {
+        const resource = e.resource;
+        return {
+          id: resource.id,
+          allergen: resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown',
+          reaction: resource.reaction?.[0]?.manifestation?.[0]?.coding?.[0]?.display || resource.reaction?.[0]?.manifestation?.[0]?.text || 'Reaction',
+          criticality: resource.criticality || 'unknown',
+        };
+      }) || [];
+    } else if (allergiesRes) {
+      const errorText = await allergiesRes.text();
+      console.log(`❌ AllergyIntolerance query failed with ${allergiesRes.status}`);
+    }
+
     console.log(`✅ Fetched Epic data:
       - Patient: ${patientData?.name?.[0]?.given?.[0] || 'Unknown'}
       - Medications: ${medications.length}
       - Observations: ${observations.length}
       - Procedures: ${procedures.length}
-      - Diagnostics: ${diagnostics.length}`);
+      - Diagnostics: ${diagnostics.length}
+      - Conditions: ${conditions.length}
+      - Allergies: ${allergies.length}`);
 
     res.json({
       patient: patientData,
@@ -745,6 +799,8 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
       observations,
       procedures,
       diagnostics,
+      conditions,
+      allergies,
     });
   } catch (error) {
     console.error('❌ Error fetching patient data:', error);
