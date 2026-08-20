@@ -676,8 +676,18 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
 
     if (observationsRes?.ok) {
       const obsBundle = await observationsRes.json();
-      console.log('Observation bundle:', JSON.stringify(obsBundle, null, 2));
-      observations = obsBundle.entry?.map(e => e.resource) || [];
+      console.log('Observation bundle entries:', obsBundle.entry?.length || 0);
+      observations = obsBundle.entry?.map(e => {
+        const resource = e.resource;
+        return {
+          id: resource.id,
+          code: resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown',
+          value: resource.valueQuantity?.value || resource.valueString || '',
+          unit: resource.valueQuantity?.unit || '',
+          date: resource.effectiveDateTime || resource.effectiveDate || new Date().toISOString(),
+        };
+      }) || [];
+      console.log('Parsed observations:', observations.length);
     } else if (observationsRes) {
       const errorText = await observationsRes.text();
       console.log(`❌ Observation query failed with ${observationsRes.status}:`, errorText);
@@ -687,7 +697,16 @@ app.post('/api/auth/epic/patient-data', async (req, res) => {
     if (vitalSignsRes?.ok) {
       const vitalBundle = await vitalSignsRes.json();
       console.log('Vital Signs bundle entries:', vitalBundle.entry?.length || 0);
-      const vitalSigns = vitalBundle.entry?.map(e => e.resource) || [];
+      const vitalSigns = vitalBundle.entry?.map(e => {
+        const resource = e.resource;
+        return {
+          id: resource.id,
+          code: resource.code?.text || resource.code?.coding?.[0]?.display || 'Unknown',
+          value: resource.valueQuantity?.value || resource.valueString || '',
+          unit: resource.valueQuantity?.unit || '',
+          date: resource.effectiveDateTime || resource.effectiveDate || new Date().toISOString(),
+        };
+      }) || [];
       observations = [...observations, ...vitalSigns];
       console.log('Total observations (labs + vitals):', observations.length);
     } else if (vitalSignsRes) {
